@@ -30,16 +30,21 @@ mode = st.sidebar.selectbox("Drawing Tool:", ("line", "freedraw"))
 color = st.sidebar.color_picker("Line Color", "#FF0000")
 
 uploaded_file = st.sidebar.file_uploader("Upload Scene Photo", type=["jpg", "jpeg", "png"])
-
 if uploaded_file:
-    img = Image.open(uploaded_file).convert("RGB")
+    # 1. Persistent Image Loading (Prevents image disappearing on interaction)
+    if "bg_img" not in st.session_state or st.session_state.get("last_uploaded") != uploaded_file.name:
+        st.session_state.bg_img = Image.open(uploaded_file).convert("RGB")
+        st.session_state.last_uploaded = uploaded_file.name
+
+    img = st.session_state.bg_img
     w, h = img.size
     
-    # Scale for mobile stability
+    # 2. Scale for stability
     display_width = 1000 if w > 1000 else w
     display_height = int(h * (display_width / w))
     img_resized = img.resize((display_width, display_height))
 
+    # 3. Drawable Canvas
     canvas_result = st_canvas(
         fill_color="rgba(255, 255, 255, 0)",
         stroke_width=4,
@@ -52,6 +57,7 @@ if uploaded_file:
         update_streamlit=True,
     )
 
+    # 4. Processing & Reporting Logic
     if canvas_result.json_data:
         objects = canvas_result.json_data["objects"]
         
@@ -82,7 +88,6 @@ if uploaded_file:
                 t_h = bbox[3] - bbox[1]
 
                 # CLAMPING LOGIC: Keep label inside the frame
-                # If too high, move below. If too far right, shift left.
                 final_x = max(10, min(left, display_width - t_w - 20))
                 final_y = top - 45 if top > 60 else top + 30
 
