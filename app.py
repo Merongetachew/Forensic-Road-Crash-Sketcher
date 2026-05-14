@@ -4,9 +4,16 @@ from streamlit_js_eval import get_geolocation
 from PIL import Image, ImageDraw
 import math
 import io
+import base64
 
 # 1. Page Configuration
 st.set_page_config(layout="wide", page_title="Forensic Road Sketcher Pro")
+
+# Helper function to fix the "Invisible Image" bug
+def get_image_base64(img):
+    buffered = io.BytesIO()
+    img.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode()
 
 # 2. GPS Detection (Sidebar)
 st.sidebar.subheader("📍 Scene Location")
@@ -38,16 +45,21 @@ if uploaded_file:
     display_height = int(orig_h * (display_width / orig_w))
     img_resized = img_raw.resize((display_width, display_height), Image.Resampling.LANCZOS)
 
+    # Encode image to Base64 to ensure visibility
+    img_b64 = get_image_base64(img_resized)
+    bg_url = f"data:image/png;base64,{img_b64}"
+
     # 3. Drawing Canvas
     canvas_result = st_canvas(
         fill_color="rgba(255, 255, 255, 0)",
         stroke_width=4,
         stroke_color=color,
         background_image=img_resized,
+        background_label=bg_url, # Forces visibility in cloud environments
         height=display_height,
         width=display_width,
         drawing_mode=mode,
-        key="forensic_canvas_v9", # Updated key to clear old cache
+        key="forensic_canvas_v11", 
         update_streamlit=True,
     )
 
@@ -97,7 +109,7 @@ if uploaded_file:
 
             # Download Section
             buf = io.BytesIO()
-            final_report.convert("RGB").save(buf, format="PNG", optimize=True) # Optimized PNG
+            final_report.convert("RGB").save(buf, format="PNG", optimize=True)
             st.sidebar.markdown("---")
             st.sidebar.download_button(
                 label="📥 Download Forensic Report",
