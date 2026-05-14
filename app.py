@@ -4,16 +4,9 @@ from streamlit_js_eval import get_geolocation
 from PIL import Image, ImageDraw
 import math
 import io
-import base64
 
 # 1. Page Configuration
 st.set_page_config(layout="wide", page_title="Forensic Road Sketcher Pro")
-
-# Helper function to fix the "Invisible Image" bug
-def get_image_base64(img):
-    buffered = io.BytesIO()
-    img.save(buffered, format="PNG")
-    return base64.b64encode(buffered.getvalue()).decode()
 
 # 2. GPS Detection (Sidebar)
 st.sidebar.subheader("📍 Scene Location")
@@ -40,26 +33,21 @@ if uploaded_file:
     img_raw = Image.open(uploaded_file).convert("RGB")
     orig_w, orig_h = img_raw.size
     
-    # Scale down for speed (Max width 1000px)
+    # Scale down for speed and RAM stability (Max width 1000px)
     display_width = 1000 if orig_w > 1000 else orig_w
     display_height = int(orig_h * (display_width / orig_w))
     img_resized = img_raw.resize((display_width, display_height), Image.Resampling.LANCZOS)
 
-    # Encode image to Base64 to ensure visibility
-    img_b64 = get_image_base64(img_resized)
-    bg_url = f"data:image/png;base64,{img_b64}"
-
-    # 3. Drawing Canvas
+    # 3. Drawing Canvas - Cleaned of problematic parameters
     canvas_result = st_canvas(
         fill_color="rgba(255, 255, 255, 0)",
         stroke_width=4,
         stroke_color=color,
         background_image=img_resized,
-        background_label=bg_url, # Forces visibility in cloud environments
         height=display_height,
         width=display_width,
         drawing_mode=mode,
-        key="forensic_canvas_v11", 
+        key="forensic_canvas_final_v1", 
         update_streamlit=True,
     )
 
@@ -68,18 +56,19 @@ if uploaded_file:
         objects = canvas_result.json_data["objects"]
         
         if len(objects) > 0:
-            # Scale reference (Assume first line is 1.0 meter)
+            # Scale reference (Assume first line drawn is 1.0 meter)
             cal = objects[0]
+            # Calculate distance using Pythagorean theorem
             px_dist = math.sqrt(cal.get('width', 0)**2 + cal.get('height', 0)**2)
             ppm = px_dist / 1.0 if px_dist > 0 else 1
 
-            # Prepare layers
+            # Prepare layers for the final forensic report
             report_img = img_resized.copy().convert("RGBA")
             sketch_layer = Image.fromarray(canvas_result.image_data.astype('uint8')).convert("RGBA")
             final_report = Image.alpha_composite(report_img, sketch_layer)
             draw = ImageDraw.Draw(final_report)
 
-            # Draw Labels
+            # Draw Labels for documentation
             for i, obj in enumerate(objects):
                 dx, dy = obj.get('width', 0), obj.get('height', 0)
                 length = math.sqrt(dx**2 + dy**2) / ppm
@@ -90,20 +79,20 @@ if uploaded_file:
                 bbox = draw.textbbox((0, 0), label)
                 t_w, t_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
 
-                # Keep text within image boundaries
+                # Ensure labels stay within image boundaries
                 final_x = max(10, min(left, display_width - t_w - 20))
                 final_y = top - 45 if top > 60 else top + 30
 
-                # High-visibility background for text
+                # High-visibility background for labels
                 draw.rectangle(
                     [final_x - 5, final_y - 5, final_x + t_w + 5, final_y + t_h + 5], 
                     fill="black", outline="white"
                 )
                 draw.text((final_x, final_y), label, fill="white")
 
-            # GPS Footer
+            # GPS Footer for forensic evidence
             footer_h = 50
-            gps_text = f"GPS: {lat_val}, {lon_val} | Forensic Road Surveillance"
+            gps_text = f"GPS: {lat_val}, {lon_val} | Road Safety Surveillance"
             draw.rectangle([0, display_height - footer_h, display_width, display_height], fill="black")
             draw.text((20, display_height - 35), gps_text, fill="yellow")
 
