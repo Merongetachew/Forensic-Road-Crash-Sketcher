@@ -26,15 +26,14 @@ color = st.sidebar.color_picker("Line Color", "#FF0000")
 uploaded_file = st.sidebar.file_uploader("Upload Scene Photo", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
-    # --- STEP 1: FAST LOAD & COMPRESS ---
-    # We use a smaller size (700px) to ensure it loads on mobile data in the field
+    # --- STEP 1: LOAD & COMPRESS ---
+    # Small size ensures it works on mobile data and doesn't time out
     img_raw = Image.open(uploaded_file).convert("RGB")
     display_width = 700 
     display_height = int(img_raw.height * (display_width / img_raw.width))
     img_resized = img_raw.resize((display_width, display_height), Image.Resampling.LANCZOS)
 
     # --- STEP 2: STABLE CANVAS ---
-    # We use a unique key to force a fresh reload of the component
     canvas_result = st_canvas(
         fill_color="rgba(255, 255, 255, 0)",
         stroke_width=4,
@@ -43,7 +42,7 @@ if uploaded_file:
         height=display_height,
         width=display_width,
         drawing_mode=mode,
-        key="forensic_v14_stable", 
+        key="forensic_v15_fixed", 
         update_streamlit=True,
     )
 
@@ -56,7 +55,7 @@ if uploaded_file:
         px_dist = math.sqrt(cal.get('width', 0)**2 + cal.get('height', 0)**2)
         ppm = px_dist / 1.0 if px_dist > 0 else 1
 
-        # Create the final forensic overlay
+        # Create overlay
         report_img = img_resized.copy().convert("RGBA")
         sketch_layer = Image.fromarray(canvas_result.image_data.astype('uint8')).convert("RGBA")
         final_report = Image.alpha_composite(report_img, sketch_layer)
@@ -71,11 +70,11 @@ if uploaded_file:
             draw.rectangle([x, y-25, x+80, y], fill="black")
             draw.text((x+5, y-20), label, fill="white")
 
-        # Evidence Footer
+        # Footer
         draw.rectangle([0, display_height-40, display_width, display_height], fill="black")
-        draw.text((10, display_height-30), f"GPS: {lat_val}, {lon_val} | Oromia Road Safety", fill="yellow")
+        draw.text((10, display_height-30), f"GPS: {lat_val}, {lon_val}", fill="yellow")
 
-        # Download Button
+        # Download
         buf = io.BytesIO()
         final_report.convert("RGB").save(buf, format="PNG")
         st.sidebar.markdown("---")
